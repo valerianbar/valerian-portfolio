@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The latest news in artificial intelligence.">
+  <title>AI News — Valerian Barreau</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='favicon-48.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="{{ url_for('home') }}" aria-label="Accueil Valerian">V<span>.</span></a><nav><a href="{{ url_for('home') }}">Portfolio</a><a href="{{ url_for('ai_news') }}" aria-current="page">AI News</a></nav></header>
+  <main>
+    <section class="news-hero"><p class="eyebrow">AI · LATEST UPDATES</p><h1>AI <span>News.</span></h1><p class="intro">The latest updates on artificial intelligence, machine learning, and data.</p><a class="news-back" href="{{ url_for('home') }}">← Back to portfolio</a></section>
+    <section class="section news-section"><p class="eyebrow">RECENT PUBLICATIONS</p><h2>Latest stories</h2>
+      {% if articles %}
+      <div class="cards news-cards">
+        {% for article in articles %}
+        <article class="card news-card"><span class="number">{{ article.source or 'AI News' }}{% if article.published_at %} · {{ article.published_at[:10] }}{% endif %}</span><h3>{{ article.title }}</h3>{% set summary = article.summary or article.description %}{% if summary %}<p>{{ summary }}</p>{% endif %}<a class="project-link" href="{{ article.link }}" target="_blank" rel="noopener noreferrer">Read article ↗</a></article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="news-empty"><h3>{% if api_error %}AI news is temporarily unavailable.{% else %}AI news is coming soon.{% endif %}</h3><p>{% if api_error %}The portfolio could not retrieve articles from n8n. Check that the workflow is published and its webhook API is responding.{% else %}No articles have been saved yet. Stories will appear here after the first n8n workflow run.{% endif %}</p></div>
+      {% endif %}
+    </section>
+  </main>
+  <footer><span>© 2026 Valerian Barreau</span><a href="{{ url_for('home') }}">Back to portfolio ↑</a></footer>
+</body>
+</html>

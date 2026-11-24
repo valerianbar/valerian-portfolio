@@ -1,0 +1,432 @@
+{
+  "name": "Portfolio - Actualités IA (10/jour, 7 jours)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -800,
+        160
+      ],
+      "id": "c30fcb7c-1bb7-498a-a820-bf4e784a9f11",
+      "name": "Tous les jours à 08 h"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS portfolio_articles (id BIGSERIAL PRIMARY KEY, link TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', published_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE portfolio_articles ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -560,
+        160
+      ],
+      "id": "f3ac9f8b-08d7-471b-a0a5-b8f55a772d6e",
+      "name": "Préparer la table et purger après 7 jours"
+    },
+    {
+      "parameters": {
+        "url": "https://www.analyticsvidhya.com/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        -160
+      ],
+      "id": "c80e89ac-a21e-474f-b7ed-bb42bde08843",
+      "name": "RSS Analytics Vidhya"
+    },
+    {
+      "parameters": {
+        "url": "https://towardsdatascience.com/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        0
+      ],
+      "id": "23b5f2bf-8512-4a3a-814f-a91ab021604e",
+      "name": "RSS Towards Data Science"
+    },
+    {
+      "parameters": {
+        "url": "https://www.kdnuggets.com/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        160
+      ],
+      "id": "7475d08b-7d2b-40c5-80c6-12df81149e70",
+      "name": "RSS KDnuggets"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=machine+learning+OR+deep+learning+OR+generative+AI&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        320
+      ],
+      "id": "fb755db4-4182-4f16-9d89-b3d7b84e36db",
+      "name": "RSS Google News IA"
+    },
+    {
+      "parameters": {
+        "url": "https://www.marktechpost.com/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        480
+      ],
+      "id": "c500bca5-9c57-49e7-b59a-4eb9fa0fda18",
+      "name": "RSS MarkTechPost"
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 5
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -80,
+        160
+      ],
+      "id": "ae2d219b-d7ba-4088-9380-6b0411f26b02",
+      "name": "Regrouper les flux RSS"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst seen = new Set();\nconst rows = [];\nfor (const item of items) {\n  const j = item.json || {};\n  const link = String(j.link || j.guid || '').trim();\n  const title = String(j.title || '').trim();\n  if (!link || !title || seen.has(link)) continue;\n  seen.add(link);\n  const dateValue = j.isoDate || j.pubDate || j.published || j.date || null;\n  const date = dateValue ? new Date(dateValue) : null;\n  rows.push({json:{title,link,description:String(j.contentSnippet || j.description || j.content || '').replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').trim().slice(0,4000),source:String(j.creator || j.author || j.feedTitle || 'Actualités IA'),published_at:date && !Number.isNaN(date.getTime()) ? date.toISOString() : null}});\n}\nrows.sort((a,b)=>(Date.parse(b.json.published_at||0)||0)-(Date.parse(a.json.published_at||0)||0));\nreturn rows.slice(0,50);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        160
+      ],
+      "id": "340bd548-9ee0-48bc-8853-d044cb8d13cc",
+      "name": "Normaliser et dédupliquer"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inserted AS (INSERT INTO portfolio_articles (link,title,description,source,published_at,summary) SELECT $1,$2,$3,$4,$5::timestamptz,$6 WHERE (SELECT COUNT(*) FROM portfolio_articles WHERE created_at >= date_trunc('day', NOW())) < 10 ON CONFLICT (link) DO NOTHING RETURNING id) SELECT id FROM inserted;",
+        "options": {
+          "queryReplacement": "={{ [$('Normaliser et dédupliquer').item.json.link, $('Normaliser et dédupliquer').item.json.title, $('Normaliser et dédupliquer').item.json.description, $('Normaliser et dédupliquer').item.json.source, $('Normaliser et dédupliquer').item.json.published_at, $json.choices[0].message.content.trim()] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        160
+      ],
+      "id": "2a1a0f66-ebeb-48d9-9bd5-8da3b45e89ba",
+      "name": "Enregistrer au plus 10 aujourd’hui"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "portfolio-articles",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        720
+      ],
+      "id": "a9003652-8f69-4b43-8543-a08a61180686",
+      "name": "API Portfolio - Articles"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS portfolio_articles (id BIGSERIAL PRIMARY KEY, link TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', published_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE portfolio_articles ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        880
+      ],
+      "id": "38afdc52-5500-44cb-9628-411aa1363d4a",
+      "name": "Initialiser la table pour l’API"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id,title,link,description,summary,source,published_at,created_at FROM portfolio_articles WHERE created_at >= NOW() - INTERVAL '7 days' ORDER BY created_at DESC LIMIT 70;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        880
+      ],
+      "id": "287f38b4-7fc0-4fb7-87d2-098e24d5fe71",
+      "name": "Lire les articles des 7 derniers jours"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $input.all().map(i => i.json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        720
+      ],
+      "id": "d97ab628-2634-4524-ad95-f56b17222055",
+      "name": "Répondre au portfolio (JSON)"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are an editor for an AI and machine-learning news portfolio. Write concise, accurate summaries in English. Use only facts present in the supplied title and article description. Do not add claims or speculation. Return 2-3 sentences, plain text only."
+            },
+            {
+              "content": "=Summarize this article in English.\nTitle: {{ $(\"Normaliser et dédupliquer\").item.json.title }}\nArticle description: {{ $(\"Normaliser et dédupliquer\").item.json.description }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 180,
+          "temperature": 0.2
+        }
+      },
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        400,
+        360
+      ],
+      "id": "88b02bfb-6364-4935-8398-35cd6470b713",
+      "name": "Résumer en anglais (OpenAI)",
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAi account",
+          "id": "JrQaEg8VCmjbouCT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Tous les jours à 08 h": {
+      "main": [
+        [
+          {
+            "node": "Préparer la table et purger après 7 jours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la table et purger après 7 jours": {
+      "main": [
+        [
+          {
+            "node": "RSS Analytics Vidhya",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Towards Data Science",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS KDnuggets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Google News IA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS MarkTechPost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Analytics Vidhya": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les flux RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Towards Data Science": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les flux RSS",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS KDnuggets": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les flux RSS",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS Google News IA": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les flux RSS",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "RSS MarkTechPost": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les flux RSS",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Regrouper les flux RSS": {
+      "main": [
+        [
+          {
+            "node": "Normaliser et dédupliquer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser et dédupliquer": {
+      "main": [
+        [
+          {
+            "node": "Résumer en anglais (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Portfolio - Articles": {
+      "main": [
+        [
+          {
+            "node": "Initialiser la table pour l’API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialiser la table pour l’API": {
+      "main": [
+        [
+          {
+            "node": "Lire les articles des 7 derniers jours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les articles des 7 derniers jours": {
+      "main": [
+        [
+          {
+            "node": "Répondre au portfolio (JSON)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Résumer en anglais (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer au plus 10 aujourd’hui",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c2104c1a-6a95-46fc-bfd3-51e96b2f609d",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -18,7 +18,7 @@
       {% if articles %}
       <div class="cards news-cards">
         {% for article in articles %}
-        <article class="card news-card"><span class="number">{{ article.source or 'AI News' }}{% if article.published_at %} · {{ article.published_at[:10] }}{% endif %}</span><h3>{{ article.title }}</h3>{% set summary = article.summary or article.description %}{% if summary %}<p>{{ summary }}</p>{% endif %}<a class="project-link" href="{{ article.link }}" target="_blank" rel="noopener noreferrer">Read article ↗</a></article>
+        <article class="card news-card"><span class="number">{{ article.source or 'AI News' }}{% if article.published_at %} · {{ article.published_at[:10] }}{% endif %}</span><h3>{{ article.title }}</h3>{% set summary = article.summary or article.description %}{% if summary %}<p>{{ summary }}</p>{% endif %}<a class="project-link" href="{{ article.link }}" target="_blank" rel="noopener noreferrer">Read article ↗︎</a></article>
         {% endfor %}
       </div>
       {% else %}
